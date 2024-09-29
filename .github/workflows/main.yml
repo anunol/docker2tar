@@ -86,6 +86,11 @@ jobs:
           echo "RELEASE_TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
         fi
 
+    - name: Compress the TAR files (final step)
+      run: |
+        # 压缩所有镜像文件为 release 名称的 tar.gz 包
+        tar -czf "${{ env.RELEASE_NAME }}.tar.gz" *.tar
+
     - name: Upload artifact to GitHub Release
       uses: ncipollo/release-action@v1
       with:
