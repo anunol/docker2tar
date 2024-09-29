@@ -63,6 +63,7 @@ jobs:
 
     - name: Get release name and tag
       run: |
+        # 检查是否提供了自定义名称
         if [ -z "${{ github.event.inputs.custom_name }}" ]; then
           # 如果未提供自定义名称，使用第一个镜像的名称作为默认名称
           images="${{ github.event.inputs.docker_images }}"
@@ -72,12 +73,17 @@ jobs:
         else
           # 使用用户提供的自定义名称
           echo "RELEASE_NAME=${{ github.event.inputs.custom_name }}" >> $GITHUB_ENV
-
-        # 如果没有提供 tag，使用当前日期作为 tag
+        fi
+        
+        # 检查是否提供了标签
         if [ -z "${{ github.event.inputs.tag }}" ]; then
+          # 如果没有提供 tag，使用当前日期作为 tag
           echo "RELEASE_TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
         else
+          # 使用用户提供的 tag
           echo "RELEASE_TAG=${{ github.event.inputs.tag }}" >> $GITHUB_ENV
+        fi
+        # 结束if语句
         fi
 
     - name: Upload artifact to GitHub Release
