@@ -60,6 +60,7 @@ jobs:
         done
 
     - name: Determine file handling logic
+      id: determine_logic  # 添加 ID 以供后续步骤引用
       run: |
         images="${{ github.event.inputs.docker_images }}"
         IFS=',' read -r -a image_array <<< "$images"
@@ -69,24 +70,48 @@ jobs:
           # 如果只有一个镜像，直接使用镜像名作为文件名，不压缩
           image_name="${image_array[0]%%:*}"
           echo "RELEASE_NAME=${image_name}.tar" >> $GITHUB_ENV
+          echo "num_images=1" >> $GITHUB_OUTPUT  # 输出结果供下一个步骤使用
         else
           # 如果有多个镜像，使用日期作为文件名，并进行压缩
           echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
+          echo "num_images=$num_images" >> $GITHUB_OUTPUT  # 输出结果供下一个步骤使用
         fi
 
     - name: Compress if necessary
-      if: steps.determine_file_handling_logic.outputs.num_images > 1
+      if: steps.determine_logic.outputs.num_images > 1
       run: |
         # 如果有多个镜像，压缩所有 .tar 文件为一个 .tar.gz 文件
         tar -czf "${{ env.RELEASE_NAME }}" *.tar
+
+    - name: Get release name and tag
+      run: |
+        # 检查是否提供了自定义名称
+        if [ -z "${{ github.event.inputs.custom_name }}" ]; then
+          # 如果未提供自定义名称，使用当前生成的 release 名称
+          release_name="${{ env.RELEASE_NAME }}"
+        else
+          # 使用用户提供的自定义名称
+          release_name="${{ github.event.inputs.custom_name }}"
+        fi
+        echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+
+        # 检查是否提供了标签
+        if [ -z "${{ github.event.inputs.tag }}" ]; then
+          # 如果没有提供 tag，使用当前日期作为 tag
+          tag_name=$(date +'%Y%m%d')
+        else
+          # 使用用户提供的 tag
+          tag_name="${{ github.event.inputs.tag }}"
+        fi
+        echo "RELEASE_TAG=$tag_name" >> $GITHUB_ENV
 
     - name: Upload artifact to GitHub Release
       uses: ncipollo/release-action@v1
       with:
         artifacts: "${{ env.RELEASE_NAME }}"  # 动态生成的文件名
         token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ env.RELEASE_TAG }}  # 使用提供的标签或当前日期
-        name: ${{ env.RELEASE_NAME }}  # 使用镜像名称或自定义名称作为 release 名称
+        tag: ${{ env.RELEASE_TAG }}  # 使用生成的 tag
+        name: ${{ env.RELEASE_NAME }}  # 使用 release 名称
         body: "These are the saved Docker images."
         draft: false
         prerelease: false
