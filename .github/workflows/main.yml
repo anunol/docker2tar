@@ -94,22 +94,17 @@ jobs:
         fi
         echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
 
-        # 检查是否提供了标签
-        if [ -z "${{ github.event.inputs.tag }}" ]; then
-          tag_name=$(date +'%Y%m%d')
-        else
-          tag_name="${{ github.event.inputs.tag }}"
-        fi
+        # 使用当前日期作为标签
+        tag_name=$(date +'%Y%m%d')
         echo "RELEASE_TAG=$tag_name" >> $GITHUB_ENV
 
-    - name: Upload artifact to GitHub Release
-      uses: ncipollo/release-action@v1
+    - name: Create or Update GitHub Release
+      uses: softprops/action-gh-release@v1
       with:
-        artifacts: "${{ env.RELEASE_NAME }}"  # 动态生成的文件名
+        tag_name: ${{ env.RELEASE_TAG }}
+        files: ${{ env.RELEASE_NAME }}
+        body: "Daily Docker Images for ${{ env.RELEASE_TAG }}"
         token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ env.RELEASE_TAG }}  # 使用生成的 tag
-        name: ${{ env.RELEASE_NAME }}  # 使用 release 名称
-        body: "These are the saved Docker images."
         draft: false
         prerelease: false
 
