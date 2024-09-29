@@ -59,7 +59,9 @@ jobs:
         done
 
     - name: Compress the TAR files
-      run: tar -czf docker-images.tar.gz *.tar
+      run: |
+        # 使用 release 名称作为文件名
+        tar -czf "${{ env.RELEASE_NAME }}.tar.gz" *.tar
 
     - name: Get release name and tag
       run: |
@@ -87,7 +89,7 @@ jobs:
     - name: Upload artifact to GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: docker-images.tar.gz
+        artifacts: "${{ env.RELEASE_NAME }}.tar.gz"  # 使用动态文件名
         token: ${{ secrets.GITHUB_TOKEN }}
         tag: ${{ env.RELEASE_TAG }}  # 使用提供的标签或默认日期作为 tag
         name: ${{ env.RELEASE_NAME }}  # 使用镜像名称或者自定义名称作为 release 名称
