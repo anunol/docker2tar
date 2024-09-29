@@ -6,7 +6,10 @@ on:
       docker_images:
         description: '请填写 Docker 镜像名称 (多个用英文逗号分开)'
         required: true
-        default: 'nginx:latest'
+        default: 'alpine:latest'
+      custom_name:
+        description: '可选: 自定义发布名称'
+        required: false
 
 jobs:
   pull_and_package:
@@ -36,26 +39,45 @@ jobs:
         images="${{ github.event.inputs.docker_images }}"
         IFS=',' read -r -a image_array <<< "$images"
         for image in "${image_array[@]}"; do
-          # 直接拉取镜像并保存
-          image_name="${image##*/}"
-          docker pull "${image}"  # 拉取指定镜像
-          docker save "${image}" -o "${image_name//\//_}.tar"  # 保存为 .tar 文件
+          # 获取镜像名称和版本
+          image_name="${image%%:*}"  # 镜像名称
+          image_tag="${image##*:}"   # 镜像标签
+          
+          # 如果标签是latest，不在文件名中显示标签
+          if [ "$image_tag" = "latest" ]; then
+            file_name="${image_name}.tar"
+          else
+            file_name="${image_name}_${image_tag}.tar"
+          fi
+          
+          # 拉取镜像并保存为文件
+          docker pull "${image}"
+          docker save "${image}" -o "${file_name}"
         done
 
     - name: Compress the TAR files
-      run: tar -czf multi-arch-images.tar.gz *.tar
+      run: tar -czf docker-images.tar.gz *.tar
 
-    - name: Get current date for versioning
-      id: versioning
-      run: echo "RELEASE_TAG=$(date +'%Y%m%d')" >> $GITHUB_ENV
+    - name: Get release name (镜像名称或者自定义名称)
+      run: |
+        if [ -z "${{ github.event.inputs.custom_name }}" ]; then
+          # 如果未提供自定义名称，使用第一个镜像的名称作为默认名称
+          images="${{ github.event.inputs.docker_images }}"
+          IFS=',' read -r -a image_array <<< "$images"
+          image_name="${image_array[0]%%:*}"  # 第一个镜像名称不带版本号
+          echo "RELEASE_NAME=${image_name}" >> $GITHUB_ENV
+        else
+          # 使用用户提供的自定义名称
+          echo "RELEASE_NAME=${{ github.event.inputs.custom_name }}" >> $GITHUB_ENV
+        fi
 
     - name: Upload artifact to GitHub Release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: multi-arch-images.tar.gz
+        artifacts: docker-images.tar.gz
         token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ env.RELEASE_TAG }}  # 使用当前日期作为tag
-        releaseName: "Multi-Arch Docker Images"
+        tag: ${{ env.RELEASE_TAG }}  # 标签使用当前日期或其他定义好的值
+        releaseName: ${{ env.RELEASE_NAME }}  # 使用镜像名称或者自定义名称作为release名称
         body: "These are the saved multi-architecture Docker images."
         draft: false
         prerelease: false
