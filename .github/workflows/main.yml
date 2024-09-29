@@ -103,7 +103,7 @@ jobs:
 
     - name: Upload to GitHub Release (if under 2GB)
       if: env.EXCEEDS_LIMIT == 'false'
-      uses: softprops/action-gh-release@v1
+      uses: softprops/action-gh-release@v1.5.0  # 升级到v1.5.0支持Node.js 20
       with:
         tag_name: ${{ env.RELEASE_TAG }}
         files: ${{ env.RELEASE_NAME }}
@@ -114,7 +114,7 @@ jobs:
       if: env.EXCEEDS_LIMIT == 'true'
       uses: actions/upload-artifact@v4  # 升级到v4支持Node.js 20
       with:
-        name: Large Docker Image Files
+        name: ${{ env.RELEASE_NAME }}  # 动态命名
         path: ${{ env.RELEASE_NAME }}
 
     - name: Clean up intermediate files (if under 2GB)
