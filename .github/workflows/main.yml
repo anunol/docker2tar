@@ -76,6 +76,7 @@ jobs:
           # 如果有多个镜像，使用日期作为文件名，并进行压缩
           echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
           echo "num_images=$num_images" >> $GITHUB_OUTPUT
+        fi  # 修复后的部分，结束 if 块
 
     - name: Compress if necessary
       if: steps.determine_logic.outputs.num_images > 1
