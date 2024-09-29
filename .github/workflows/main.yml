@@ -76,13 +76,23 @@ jobs:
           # 如果有多个镜像，使用日期作为文件名，并进行压缩
           echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
           echo "num_images=$num_images" >> $GITHUB_OUTPUT
-        fi
 
     - name: Compress if necessary
       if: steps.determine_logic.outputs.num_images > 1
       run: |
         # 如果有多个镜像，压缩所有 .tar 文件为一个 .tar.gz 文件
         tar -czf "${{ env.RELEASE_NAME }}" *.tar
+
+    - name: Check file size
+      id: check_size
+      run: |
+        file_size=$(stat -c%s "${{ env.RELEASE_NAME }}")
+        max_size=$((2 * 1024 * 1024 * 1024))  # 2GB in bytes
+
+        if [ "$file_size" -gt "$max_size" ]; then
+          echo "EXCEEDS_LIMIT=true" >> $GITHUB_ENV
+        else
+          echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
 
     - name: Get release name and tag
       run: |
@@ -98,7 +108,8 @@ jobs:
         tag_name=$(date +'%Y%m%d')
         echo "RELEASE_TAG=$tag_name" >> $GITHUB_ENV
 
-    - name: Create or Update GitHub Release
+    - name: Upload to GitHub Release (if under 2GB)
+      if: env.EXCEEDS_LIMIT == 'false'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.RELEASE_TAG }}
@@ -108,6 +119,14 @@ jobs:
         draft: false
         prerelease: false
 
-    - name: Clean up intermediate files
+    - name: Upload as artifact (if over 2GB)
+      if: env.EXCEEDS_LIMIT == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: Large Docker Image Files
+        path: ${{ env.RELEASE_NAME }}
+
+    - name: Clean up intermediate files (if under 2GB)
+      if: env.EXCEEDS_LIMIT == 'false'
       run: |
         rm *.tar
