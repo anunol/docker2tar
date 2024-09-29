@@ -94,6 +94,7 @@ jobs:
           echo "EXCEEDS_LIMIT=true" >> $GITHUB_ENV
         else
           echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
+        fi  # 确保 if 语句正确关闭
 
     - name: Get release name and tag
       run: |
