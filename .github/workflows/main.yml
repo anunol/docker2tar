@@ -23,14 +23,14 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3  # 升级到v3支持Node.js 20
 
     - name: Create builder and use it
       run: |
         docker buildx create --use
 
     - name: Install QEMU for multi-arch support
-      uses: docker/setup-qemu-action@v2
+      uses: docker/setup-qemu-action@v3  # 升级到v3支持Node.js 20
 
     - name: Clean up Docker to free space
       run: |
@@ -42,19 +42,16 @@ jobs:
         images="${{ github.event.inputs.docker_images }}"
         IFS=',' read -r -a image_array <<< "$images"
         for image in "${image_array[@]}"; do
-          # 提取镜像的名称和版本
-          image_name_with_registry="${image%%:*}"  # 包含注册表的镜像名称
-          image_name="${image_name_with_registry##*/}"  # 去掉注册表部分的镜像名称
-          image_tag="${image##*:}"   # 镜像标签
-          
-          # 如果标签是latest，不在文件名中显示标签
+          image_name_with_registry="${image%%:*}"
+          image_name="${image_name_with_registry##*/}"
+          image_tag="${image##*:}"
+
           if [ "$image_tag" = "latest" ]; then
             file_name="${image_name}.tar"
           else
             file_name="${image_name}_${image_tag}.tar"
           fi
-          
-          # 拉取镜像并保存为文件
+
           docker pull "${image}"
           docker save "${image}" -o "${file_name}"
         done
@@ -67,46 +64,40 @@ jobs:
         num_images=${#image_array[@]}
 
         if [ $num_images -eq 1 ]; then
-          # 如果只有一个镜像，直接使用镜像名作为文件名，不压缩
           image_name="${image_array[0]%%:*}"
           image_name="${image_name##*/}"
           echo "RELEASE_NAME=${image_name}.tar" >> $GITHUB_ENV
           echo "num_images=1" >> $GITHUB_OUTPUT
         else
-          # 如果有多个镜像，使用日期作为文件名，并进行压缩
           echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
           echo "num_images=$num_images" >> $GITHUB_OUTPUT
-        fi  # 修复后的部分，结束 if 块
+        fi
 
     - name: Compress if necessary
       if: steps.determine_logic.outputs.num_images > 1
       run: |
-        # 如果有多个镜像，压缩所有 .tar 文件为一个 .tar.gz 文件
         tar -czf "${{ env.RELEASE_NAME }}" *.tar
 
     - name: Check file size
       id: check_size
       run: |
         file_size=$(stat -c%s "${{ env.RELEASE_NAME }}")
-        max_size=$((2 * 1024 * 1024 * 1024))  # 2GB in bytes
+        max_size=$((2 * 1024 * 1024 * 1024))
 
         if [ "$file_size" -gt "$max_size" ]; then
           echo "EXCEEDS_LIMIT=true" >> $GITHUB_ENV
         else
           echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
-        fi  # 确保 if 语句正确关闭
+        fi
 
     - name: Get release name and tag
       run: |
-        # 检查是否提供了自定义名称
         if [ -z "${{ github.event.inputs.custom_name }}" ]; then
           release_name="${{ env.RELEASE_NAME }}"
         else
           release_name="${{ github.event.inputs.custom_name }}"
         fi
         echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
-
-        # 使用当前日期作为标签
         tag_name=$(date +'%Y%m%d')
         echo "RELEASE_TAG=$tag_name" >> $GITHUB_ENV
 
@@ -118,12 +109,10 @@ jobs:
         files: ${{ env.RELEASE_NAME }}
         body: "Daily Docker Images for ${{ env.RELEASE_TAG }}"
         token: ${{ secrets.GITHUB_TOKEN }}
-        draft: false
-        prerelease: false
 
     - name: Upload as artifact (if over 2GB)
       if: env.EXCEEDS_LIMIT == 'true'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4  # 升级到v4支持Node.js 20
       with:
         name: Large Docker Image Files
         path: ${{ env.RELEASE_NAME }}
