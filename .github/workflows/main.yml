@@ -103,7 +103,7 @@ jobs:
 
     - name: Upload to GitHub Release (if under 2GB)
       if: env.EXCEEDS_LIMIT == 'false'
-      uses: softprops/action-gh-release@v1.5.0  # 升级到v1.5.0支持Node.js 20
+      uses: softprops/action-gh-release@v1  
       with:
         tag_name: ${{ env.RELEASE_TAG }}
         files: ${{ env.RELEASE_NAME }}
