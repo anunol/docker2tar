@@ -8,7 +8,7 @@ on:
         required: true
         default: 'alpine:latest'
       custom_name:
-        description: '可选: 自定义发布名称'
+        description: '可选: 自定义发布名称 (例如: ng)'
         required: false
       tag:
         description: '可选: 发布标签 (默认为当前日期)'
@@ -23,14 +23,14 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3  # 升级到v3支持Node.js 20
+      uses: docker/setup-buildx-action@v3
 
     - name: Create builder and use it
       run: |
         docker buildx create --use
 
     - name: Install QEMU for multi-arch support
-      uses: docker/setup-qemu-action@v3  # 升级到v3支持Node.js 20
+      uses: docker/setup-qemu-action@v3
 
     - name: Clean up Docker to free space
       run: |
@@ -66,10 +66,10 @@ jobs:
         if [ $num_images -eq 1 ]; then
           image_name="${image_array[0]%%:*}"
           image_name="${image_name##*/}"
-          echo "RELEASE_NAME=${image_name}.tar" >> $GITHUB_ENV
+          echo "RELEASE_NAME=${{ github.event.inputs.custom_name }}.tar" >> $GITHUB_ENV
           echo "num_images=1" >> $GITHUB_OUTPUT
         else
-          echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
+          echo "RELEASE_NAME=${{ github.event.inputs.custom_name }}.tar.gz" >> $GITHUB_ENV
           echo "num_images=$num_images" >> $GITHUB_OUTPUT
         fi
 
@@ -92,12 +92,11 @@ jobs:
 
     - name: Get release name and tag
       run: |
-        if [ -z "${{ github.event.inputs.custom_name }}" ]; then
-          release_name="${{ env.RELEASE_NAME }}"
-        else
-          release_name="${{ github.event.inputs.custom_name }}_$(date +'%Y%m%d%H%M%S')"
+        release_name="${{ github.event.inputs.custom_name }}"
+        if [ -z "$release_name" ]; then
+          release_name="default"
         fi
-        echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+        echo "RELEASE_NAME=${release_name}" >> $GITHUB_ENV
 
         if [ -z "${{ github.event.inputs.tag }}" ]; then
           tag_name=$(date +'%Y%m%d')
@@ -111,15 +110,15 @@ jobs:
       uses: softprops/action-gh-release@v1  
       with:
         tag_name: ${{ env.RELEASE_TAG }}
-        files: ${{ env.RELEASE_NAME }}
+        files: ${{ env.RELEASE_NAME }}  # 确保这里的文件名正确
         body: "Daily Docker Images for ${{ env.RELEASE_TAG }}"
         token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Upload as artifact (if over 2GB)
       if: env.EXCEEDS_LIMIT == 'true'
-      uses: actions/upload-artifact@v4  # 升级到v4支持Node.js 20
+      uses: actions/upload-artifact@v4  
       with:
-        name: ${{ env.RELEASE_NAME }}  # 动态命名
+        name: ${{ env.RELEASE_NAME }}
         path: ${{ env.RELEASE_NAME }}
 
     - name: Clean up intermediate files (if under 2GB)
