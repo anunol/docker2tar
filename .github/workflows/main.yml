@@ -85,9 +85,11 @@ jobs:
         tar -czf "${{ env.CUSTOM_FILE }}" *.tar
 
     - name: Check file size
-      id: check_size
       run: |
-        file="${{ env.CUSTOM_FILE }}"
+        file="${{ env.ORIGINAL_FILE }}"
+        if [ -f "${{ env.CUSTOM_FILE }}" ]; then
+          file="${{ env.CUSTOM_FILE }}"
+        fi
         file_size=$(stat -c%s "$file")
         max_size=$((2 * 1024 * 1024 * 1024))
 
