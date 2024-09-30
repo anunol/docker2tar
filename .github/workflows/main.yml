@@ -1,4 +1,4 @@
-name: Docker镜像智能打包离线包
+name: Docker镜像打包为离线包
 
 on:
   workflow_dispatch:
@@ -67,20 +67,19 @@ jobs:
           else
             custom_file="${{ github.event.inputs.custom_name }}.tar"
           fi
-          echo "CUSTOM_FILE=${custom_file}" >> $GITHUB_ENV
         else
           custom_file="$(date +'%Y%m%d').tar.gz"
           if [ -n "${{ github.event.inputs.custom_name }}" ]; then
             custom_file="${{ github.event.inputs.custom_name }}.tar.gz"
           fi
-          echo "CUSTOM_FILE=${custom_file}" >> $GITHUB_ENV
         fi
+        echo "CUSTOM_FILE=${custom_file}" >> $GITHUB_ENV
 
     - name: Compress if necessary
       if: steps.determine_logic.outputs.num_images > 1
       run: tar -czf "${{ env.CUSTOM_FILE }}" *.tar
 
-    - name: Rename file just before file size check
+    - name: Rename file
       if: steps.determine_logic.outputs.num_images == 1
       run: |
         if [ "${{ env.ORIGINAL_FILE }}" != "${{ env.CUSTOM_FILE }}" ]; then
@@ -92,7 +91,7 @@ jobs:
       run: |
         file="${{ env.CUSTOM_FILE }}"
         if [ ! -f "$file" ]; then
-          echo "File not found!"
+          echo "文件未找到！"
           exit 1
         fi
         file_size=$(stat -c%s "$file")
