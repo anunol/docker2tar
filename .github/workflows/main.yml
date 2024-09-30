@@ -95,10 +95,15 @@ jobs:
         if [ -z "${{ github.event.inputs.custom_name }}" ]; then
           release_name="${{ env.RELEASE_NAME }}"
         else
-          release_name="${{ github.event.inputs.custom_name }}"
+          release_name="${{ github.event.inputs.custom_name }}_$(date +'%Y%m%d%H%M%S')"
         fi
         echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
-        tag_name=$(date +'%Y%m%d')
+
+        if [ -z "${{ github.event.inputs.tag }}" ]; then
+          tag_name=$(date +'%Y%m%d')
+        else
+          tag_name="${{ github.event.inputs.tag }}"
+        fi
         echo "RELEASE_TAG=$tag_name" >> $GITHUB_ENV
 
     - name: Upload to GitHub Release (if under 2GB)
