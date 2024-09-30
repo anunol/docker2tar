@@ -26,8 +26,7 @@ jobs:
       uses: docker/setup-buildx-action@v3
 
     - name: Create builder and use it
-      run: |
-        docker buildx create --use
+      run: docker buildx create --use
 
     - name: Install QEMU for multi-arch support
       uses: docker/setup-qemu-action@v3
@@ -52,8 +51,15 @@ jobs:
             file_name="${image_name}_${image_tag}.tar"
           fi
 
+          # 尝试拉取和保存镜像
           docker pull "${image}"
           docker save "${image}" -o "${file_name}"
+
+          # 检查文件是否成功生成
+          if [ ! -f "$file_name" ]; then
+            echo "Error: 文件 $file_name 未能生成，工作流退出。"
+            exit 1
+          fi
         done
 
     - name: Determine file handling logic
@@ -64,20 +70,19 @@ jobs:
         num_images=${#image_array[@]}
 
         if [ $num_images -eq 1 ]; then
-          image_name="${image_array[0]%%:*}"
-          image_name="${image_name##*/}"
           echo "RELEASE_NAME=${{ github.event.inputs.custom_name }}.tar" >> $GITHUB_ENV
-          echo "num_images=1" >> $GITHUB_OUTPUT
         else
           echo "RELEASE_NAME=${{ github.event.inputs.custom_name }}.tar.gz" >> $GITHUB_ENV
-          echo "num_images=$num_images" >> $GITHUB_OUTPUT
         fi
 
     - name: Compress if necessary
       run: |
-        if [ "${{ steps.determine_logic.outputs.num_images }}" -gt 1 ]; then
+        if [[ "${{ github.event.inputs.custom_name }}" && "${{ steps.determine_logic.outputs.num_images }}" -gt 1 ]]; then
           tar -czf "${{ env.RELEASE_NAME }}" *.tar
-          echo "RELEASE_NAME=${{ env.RELEASE_NAME }}" >> $GITHUB_ENV
+          if [ ! -f "${{ env.RELEASE_NAME }}" ]; then
+            echo "Error: 文件 ${RELEASE_NAME} 未能生成，工作流退出。"
+            exit 1
+          fi
         fi
 
     - name: Check file size
@@ -112,7 +117,7 @@ jobs:
       uses: softprops/action-gh-release@v1  
       with:
         tag_name: ${{ env.RELEASE_TAG }}
-        files: ${{ env.RELEASE_NAME }}  # 确保这里的文件名正确
+        files: ${{ env.RELEASE_NAME }}
         body: "Daily Docker Images for ${{ env.RELEASE_TAG }}"
         token: ${{ secrets.GITHUB_TOKEN }}
 
