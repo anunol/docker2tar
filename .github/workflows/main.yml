@@ -63,8 +63,12 @@ jobs:
         num_images=${#image_array[@]}
 
         if [ $num_images -eq 1 ]; then
-          single_file="${image_array[0]%%:*}"
-          single_file="${single_file##*/}.tar"
+          if [ -z "${{ github.event.inputs.custom_name }}" ]; then
+            single_file="${image_array[0]%%:*}"
+            single_file="${single_file##*/}.tar"
+          else
+            single_file="${{ github.event.inputs.custom_name }}.tar"
+          fi
           echo "RELEASE_NAME=${single_file}" >> $GITHUB_ENV
           echo "num_images=1" >> $GITHUB_OUTPUT
         else
@@ -97,16 +101,7 @@ jobs:
 
     - name: Get release name and tag
       run: |
-        if [ ${{ steps.determine_logic.outputs.num_images }} -gt 1 ]; then
-          if [ -z "${{ github.event.inputs.custom_name }}" ]; then
-            release_name="${{ env.RELEASE_NAME }}"
-          else
-            release_name="${{ github.event.inputs.custom_name }}.tar.gz"
-          fi
-        else
-          release_name="${{ env.RELEASE_NAME }}"
-        fi
-        echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
+        release_name="${{ env.RELEASE_NAME }}"
 
         if [ -z "${{ github.event.inputs.tag }}" ]; then
           tag_name=$(date +'%Y%m%d')
