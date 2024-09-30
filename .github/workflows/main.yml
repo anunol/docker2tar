@@ -86,10 +86,7 @@ jobs:
 
     - name: Check file size
       run: |
-        file="${{ env.ORIGINAL_FILE }}"
-        if [ -f "${{ env.CUSTOM_FILE }}" ]; then
-          file="${{ env.CUSTOM_FILE }}"
-        fi
+        file="${{ env.CUSTOM_FILE }}"
         file_size=$(stat -c%s "$file")
         max_size=$((2 * 1024 * 1024 * 1024))
 
@@ -99,14 +96,15 @@ jobs:
           echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
         fi
 
-    - name: Rename file just before upload
+    - name: Rename file just before upload (if needed)
       if: steps.determine_logic.outputs.num_images == 1
       run: |
-        mv "${{ env.ORIGINAL_FILE }}" "${{ env.CUSTOM_FILE }}"
-        ls -lh  # Check if file exists
+        if [ "${{ env.ORIGINAL_FILE }}" != "${{ env.CUSTOM_FILE }}" ]; then
+          mv "${{ env.ORIGINAL_FILE }}" "${{ env.CUSTOM_FILE }}"
+        fi
+        ls -lh  # Double-check the files
 
     - name: Verify file for upload
-      if: steps.determine_logic.outputs.num_images == 1
       run: |
         if [ ! -f "${{ env.CUSTOM_FILE }}" ]; then
           echo "File not found!"
@@ -125,7 +123,7 @@ jobs:
         echo "RELEASE_TAG=$tag_name" >> $GITHUB_ENV
 
     - name: Upload to GitHub Release (if under 2GB)
-      if: env.EXCEEDS_LIMIT == 'false'
+      if: env.EXCEEDS_LIMIT == 'false' && steps.verify_file.outputs.result == 'success'
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.RELEASE_TAG }}
