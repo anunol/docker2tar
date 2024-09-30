@@ -23,14 +23,14 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3  # 升级到v3支持Node.js 20
+      uses: docker/setup-buildx-action@v3
 
     - name: Create builder and use it
       run: |
         docker buildx create --use
 
     - name: Install QEMU for multi-arch support
-      uses: docker/setup-qemu-action@v3  # 升级到v3支持Node.js 20
+      uses: docker/setup-qemu-action@v3
 
     - name: Clean up Docker to free space
       run: |
@@ -45,16 +45,15 @@ jobs:
           image_name_with_registry="${image%%:*}"
           image_name="${image_name_with_registry##*/}"
           image_tag="${image##*:}"
-
-          if [ "$image_tag" = "latest" ]; then
-            file_name="${image_name}.tar"
-          else
-            file_name="${image_name}_${image_tag}.tar"
-          fi
-
+          
+          file_name="${image_name}.tar"
           docker pull "${image}"
           docker save "${image}" -o "${file_name}"
         done
+
+    - name: List Files for Debugging
+      run: |
+        ls -lh
 
     - name: Determine file handling logic
       id: determine_logic
@@ -67,6 +66,7 @@ jobs:
           image_name="${image_array[0]%%:*}"
           image_name="${image_name##*/}"
           echo "RELEASE_NAME=${image_name}.tar" >> $GITHUB_ENV
+          echo "single_file=${image_name}.tar" >> $GITHUB_OUTPUT
           echo "num_images=1" >> $GITHUB_OUTPUT
         else
           echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
@@ -81,7 +81,9 @@ jobs:
     - name: Check file size
       id: check_size
       run: |
-        file_size=$(stat -c%s "${{ env.RELEASE_NAME }}")
+        file="${{ steps.determine_logic.outputs.single_file }}"
+        [ -z "$file" ] && file="${{ env.RELEASE_NAME }}"
+        file_size=$(stat -c%s "$file")
         max_size=$((2 * 1024 * 1024 * 1024))
 
         if [ "$file_size" -gt "$max_size" ]; then
@@ -89,7 +91,7 @@ jobs:
         else
           echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
         fi
-
+    
     - name: Get release name and tag
       run: |
         if [ -z "${{ github.event.inputs.custom_name }}" ]; then
@@ -108,7 +110,7 @@ jobs:
 
     - name: Upload to GitHub Release (if under 2GB)
       if: env.EXCEEDS_LIMIT == 'false'
-      uses: softprops/action-gh-release@v1  
+      uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.RELEASE_TAG }}
         files: ${{ env.RELEASE_NAME }}
@@ -117,9 +119,9 @@ jobs:
 
     - name: Upload as artifact (if over 2GB)
       if: env.EXCEEDS_LIMIT == 'true'
-      uses: actions/upload-artifact@v4  # 升级到v4支持Node.js 20
+      uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.RELEASE_NAME }}  # 动态命名
+        name: ${{ env.RELEASE_NAME }}
         path: ${{ env.RELEASE_NAME }}
 
     - name: Clean up intermediate files (if under 2GB)
