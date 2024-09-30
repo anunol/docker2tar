@@ -22,35 +22,18 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
-
-    - name: Create builder and use it
-      run: docker buildx create --use
-
-    - name: Install QEMU for multi-arch support
-      uses: docker/setup-qemu-action@v3
-
-    - name: Clean up Docker to free space
-      run: |
-        docker system prune -a -f
-        docker volume prune -f
-
-    - name: Pull and Save Multi-Arch Docker Images
+    - name: Pull and Save Docker Images
       run: |
         images="${{ github.event.inputs.docker_images }}"
         IFS=',' read -r -a image_array <<< "$images"
         for image in "${image_array[@]}"; do
-          image_name_with_registry="${image%%:*}"
-          image_name="${image_name_with_registry##*/}"
+          image_name="${image%%:*}"
+          image_name="${image_name##*/}"
 
           file_name="${image_name}.tar"
           docker pull "${image}"
           docker save "${image}" -o "${file_name}"
         done
-
-    - name: List Files for Debugging
-      run: ls -lh
 
     - name: Determine file handling logic
       id: determine_logic
@@ -61,7 +44,7 @@ jobs:
 
         if [ $num_images -eq 1 ]; then
           original_file="${image_array[0]%%:*}.tar"
-          echo "ORIGINAL_FILE=${original_file}" >> $GITHUB_ENV
+          echo "ORIGINAL_FILE=$original_file" >> $GITHUB_ENV
           if [ -z "${{ github.event.inputs.custom_name }}" ]; then
             custom_file="$original_file"
           else
@@ -73,18 +56,16 @@ jobs:
             custom_file="${{ github.event.inputs.custom_name }}.tar.gz"
           fi
         fi
-        echo "CUSTOM_FILE=${custom_file}" >> $GITHUB_ENV
+        echo "CUSTOM_FILE=$custom_file" >> $GITHUB_ENV
 
     - name: Compress if necessary
-      if: steps.determine_logic.outputs.num_images > 1
+      if: ${{ steps.determine_logic.outputs.num_images }} -gt 1
       run: tar -czf "${{ env.CUSTOM_FILE }}" *.tar
 
     - name: Rename file
-      if: steps.determine_logic.outputs.num_images == 1
+      if: ${{ steps.determine_logic.outputs.num_images == 1 && env.ORIGINAL_FILE != env.CUSTOM_FILE }}
       run: |
-        if [ "${{ env.ORIGINAL_FILE }}" != "${{ env.CUSTOM_FILE }}" ]; then
-          mv "${{ env.ORIGINAL_FILE }}" "${{ env.CUSTOM_FILE }}"
-        fi
+        mv "${{ env.ORIGINAL_FILE }}" "${{ env.CUSTOM_FILE }}"
         ls -lh
 
     - name: Check file size
