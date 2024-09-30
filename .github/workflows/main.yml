@@ -44,7 +44,6 @@ jobs:
         for image in "${image_array[@]}"; do
           image_name_with_registry="${image%%:*}"
           image_name="${image_name_with_registry##*/}"
-          image_tag="${image##*:}"
 
           file_name="${image_name}.tar"
           docker pull "${image}"
@@ -63,33 +62,32 @@ jobs:
         num_images=${#image_array[@]}
 
         if [ $num_images -eq 1 ]; then
+          original_file="${image_array[0]%%:*}"
+          original_file="${original_file##*/}.tar"
+          echo "ORIGINAL_FILE=${original_file}" >> $GITHUB_ENV
           if [ -z "${{ github.event.inputs.custom_name }}" ]; then
-            single_file="${image_array[0]%%:*}"
-            single_file="${single_file##*/}.tar"
+            custom_file="$original_file"
           else
-            single_file="${{ github.event.inputs.custom_name }}.tar"
+            custom_file="${{ github.event.inputs.custom_name }}.tar"
           fi
-          echo "RELEASE_NAME=${single_file}" >> $GITHUB_ENV
-          echo "num_images=1" >> $GITHUB_OUTPUT
+          echo "CUSTOM_FILE=${custom_file}" >> $GITHUB_ENV
         else
-          if [ -z "${{ github.event.inputs.custom_name }}" ]; then
-            archive_name="$(date +'%Y%m%d').tar.gz"
-          else
-            archive_name="${{ github.event.inputs.custom_name }}.tar.gz"
+          custom_file="$(date +'%Y%m%d').tar.gz"
+          if [ -n "${{ github.event.inputs.custom_name }}" ]; then
+            custom_file="${{ github.event.inputs.custom_name }}.tar.gz"
           fi
-          echo "RELEASE_NAME=${archive_name}" >> $GITHUB_ENV
-          echo "num_images=$num_images" >> $GITHUB_OUTPUT
+          echo "CUSTOM_FILE=${custom_file}" >> $GITHUB_ENV
         fi
 
     - name: Compress if necessary
       if: steps.determine_logic.outputs.num_images > 1
       run: |
-        tar -czf "${{ env.RELEASE_NAME }}" *.tar
+        tar -czf "${{ env.CUSTOM_FILE }}" *.tar
 
     - name: Check file size
       id: check_size
       run: |
-        file="${{ env.RELEASE_NAME }}"
+        file="${{ env.CUSTOM_FILE }}"
         file_size=$(stat -c%s "$file")
         max_size=$((2 * 1024 * 1024 * 1024))
 
@@ -99,9 +97,14 @@ jobs:
           echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
         fi
 
+    - name: Rename file just before upload
+      if: steps.determine_logic.outputs.num_images == 1
+      run: |
+        mv "${{ env.ORIGINAL_FILE }}" "${{ env.CUSTOM_FILE }}"
+
     - name: Get release name and tag
       run: |
-        release_name="${{ env.RELEASE_NAME }}"
+        release_name="${{ env.CUSTOM_FILE }}"
 
         if [ -z "${{ github.event.inputs.tag }}" ]; then
           tag_name=$(date +'%Y%m%d')
@@ -115,7 +118,7 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         tag_name: ${{ env.RELEASE_TAG }}
-        files: ${{ env.RELEASE_NAME }}
+        files: ${{ env.CUSTOM_FILE }}
         body: "Daily Docker Images for ${{ env.RELEASE_TAG }}"
         token: ${{ secrets.GITHUB_TOKEN }}
 
@@ -123,8 +126,8 @@ jobs:
       if: env.EXCEEDS_LIMIT == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: ${{ env.RELEASE_NAME }}
-        path: ${{ env.RELEASE_NAME }}
+        name: ${{ env.CUSTOM_FILE }}
+        path: ${{ env.CUSTOM_FILE }}
 
     - name: Clean up intermediate files (if under 2GB)
       if: env.EXCEEDS_LIMIT == 'false'
