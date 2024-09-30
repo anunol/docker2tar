@@ -45,7 +45,7 @@ jobs:
           image_name_with_registry="${image%%:*}"
           image_name="${image_name_with_registry##*/}"
           image_tag="${image##*:}"
-          
+
           file_name="${image_name}.tar"
           docker pull "${image}"
           docker save "${image}" -o "${file_name}"
@@ -63,13 +63,17 @@ jobs:
         num_images=${#image_array[@]}
 
         if [ $num_images -eq 1 ]; then
-          image_name="${image_array[0]%%:*}"
-          image_name="${image_name##*/}"
-          echo "RELEASE_NAME=${image_name}.tar" >> $GITHUB_ENV
-          echo "single_file=${image_name}.tar" >> $GITHUB_OUTPUT
+          single_file="${image_array[0]%%:*}"
+          single_file="${single_file##*/}.tar"
+          echo "RELEASE_NAME=${single_file}" >> $GITHUB_ENV
           echo "num_images=1" >> $GITHUB_OUTPUT
         else
-          echo "RELEASE_NAME=$(date +'%Y%m%d').tar.gz" >> $GITHUB_ENV
+          if [ -z "${{ github.event.inputs.custom_name }}" ]; then
+            archive_name="$(date +'%Y%m%d').tar.gz"
+          else
+            archive_name="${{ github.event.inputs.custom_name }}.tar.gz"
+          fi
+          echo "RELEASE_NAME=${archive_name}" >> $GITHUB_ENV
           echo "num_images=$num_images" >> $GITHUB_OUTPUT
         fi
 
@@ -81,8 +85,7 @@ jobs:
     - name: Check file size
       id: check_size
       run: |
-        file="${{ steps.determine_logic.outputs.single_file }}"
-        [ -z "$file" ] && file="${{ env.RELEASE_NAME }}"
+        file="${{ env.RELEASE_NAME }}"
         file_size=$(stat -c%s "$file")
         max_size=$((2 * 1024 * 1024 * 1024))
 
@@ -91,13 +94,17 @@ jobs:
         else
           echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
         fi
-    
+
     - name: Get release name and tag
       run: |
-        if [ -z "${{ github.event.inputs.custom_name }}" ]; then
-          release_name="${{ env.RELEASE_NAME }}"
+        if [ ${{ steps.determine_logic.outputs.num_images }} -gt 1 ]; then
+          if [ -z "${{ github.event.inputs.custom_name }}" ]; then
+            release_name="${{ env.RELEASE_NAME }}"
+          else
+            release_name="${{ github.event.inputs.custom_name }}.tar.gz"
+          fi
         else
-          release_name="${{ github.event.inputs.custom_name }}_$(date +'%Y%m%d%H%M%S')"
+          release_name="${{ env.RELEASE_NAME }}"
         fi
         echo "RELEASE_NAME=$release_name" >> $GITHUB_ENV
 
