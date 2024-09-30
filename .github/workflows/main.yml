@@ -88,13 +88,18 @@ jobs:
     - name: Check file size
       id: check_size
       run: |
-        file_size=$(stat -c%s "${{ env.RELEASE_NAME }}")
-        max_size=$((2 * 1024 * 1024 * 1024))
+        if [ -f "${{ env.RELEASE_NAME }}" ]; then
+          file_size=$(stat -c%s "${{ env.RELEASE_NAME }}")
+          max_size=$((2 * 1024 * 1024 * 1024))
 
-        if [ "$file_size" -gt "$max_size" ]; then
-          echo "EXCEEDS_LIMIT=true" >> $GITHUB_ENV
+          if [ "$file_size" -gt "$max_size" ]; then
+            echo "EXCEEDS_LIMIT=true" >> $GITHUB_ENV
+          else
+            echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
+          fi
         else
-          echo "EXCEEDS_LIMIT=false" >> $GITHUB_ENV
+          echo "Error: 文件 ${RELEASE_NAME} 不存在，工作流退出。"
+          exit 1
         fi
 
     - name: Get release name and tag
