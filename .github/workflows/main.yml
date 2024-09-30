@@ -103,11 +103,20 @@ jobs:
       if: steps.determine_logic.outputs.num_images == 1
       run: |
         mv "${{ env.ORIGINAL_FILE }}" "${{ env.CUSTOM_FILE }}"
+        ls -lh  # Check if file exists
+
+    - name: Verify file for upload
+      if: steps.determine_logic.outputs.num_images == 1
+      run: |
+        if [ ! -f "${{ env.CUSTOM_FILE }}" ]; then
+          echo "File not found!"
+          exit 1
+        fi
 
     - name: Get release name and tag
       run: |
         release_name="${{ env.CUSTOM_FILE }}"
-
+        
         if [ -z "${{ github.event.inputs.tag }}" ]; then
           tag_name=$(date +'%Y%m%d')
         else
