@@ -74,9 +74,11 @@ jobs:
         fi
 
     - name: Compress if necessary
-      if: steps.determine_logic.outputs.num_images > 1
       run: |
-        tar -czf "${{ env.RELEASE_NAME }}" *.tar
+        if [ "${{ outputs.num_images }}" -gt 1 ]; then
+          tar -czf "${{ env.RELEASE_NAME }}" *.tar
+          echo "RELEASE_NAME=${{ env.RELEASE_NAME }}" >> $GITHUB_ENV
+        fi
 
     - name: Check file size
       id: check_size
